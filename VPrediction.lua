@@ -1087,7 +1087,7 @@ end
 
 function VPrediction:OnTick()
 	--[[Delete the old saved Waypoints]]
-	if self.lastick == nil or self:GetTime() - self.lastick > 1 then
+	if self.lastick == nil or self:GetTime() - self.lastick > 0.2 then
 		self.lastick = self:GetTime()
 		for NID, TargetWaypoints in pairs(self.TargetsWaypoints) do
 			local i = 1 
