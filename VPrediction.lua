@@ -1,5 +1,5 @@
 local AUTO_UPDATE = true
-local version = '3.015'
+local version = '3.016'
 local UPDATE_HOST = 'raw.github.com'
 local UPDATE_PATH = '/SidaBoL/Chaos/master/VPrediction.lua?rand='..math.random(1,10000)
 local UPDATE_FILE_PATH = LIB_PATH..'vPrediction.lua'
@@ -64,6 +64,7 @@ function VPrediction:__init()
 	AddTickCallback(function() self:OnTick() end)
 	AddDrawCallback(function() self:OnDraw() end)
 	AddProcessSpellCallback(function(unit, spell) self:CollisionProcessSpell(unit, spell) end)
+	AddApplyBuffCallback(function(p1, p2, p3) self:OnApplyBuff(p1, p2, p3) end)
 	self.BlackList = 
 	{
 		{name = 'aatroxq', duration = 0.75}, -- 4 Dashes, OnDash fails
@@ -1099,32 +1100,26 @@ function VPrediction:OnTick()
 				end
 			end
 		end
+	end
+end
 
-		for i, unit in ipairs(GetEnemyHeroes()) do
-			-- Ignore enemies that are far away for performance reasons
-			if(GetDistanceSqr(myHero, unit) < 3000 * 3000) then
-				for j = 1, unit.buffCount do
-					local buff = unit:getBuff(j)
-					if buff.valid and buff.type ~= nil then
-						-- CC, including stuns, snares etc..
-						if (buff.type == 5 or buff.type == 11  or buff.type == 29 or buff.type == 30) then
-							if self.TargetsImmobile[unit.networkID] and self.TargetsImmobile[unit.networkID] < self:GetTime() then
-								self.TargetsImmobile[unit.networkID] = self:GetTime() + (buff.endT-buff.startT)
-							end
-							return
-						end
-						
-						-- Slows, including charm, flee, etc.
-						if (buff.type == 10 or buff.type == 21 or buff.type == 22 or buff.type == 28) then
-							if self.TargetsSlowed[unit.networkID] and self.TargetsSlowed[unit.networkID] < self:GetTime() then
-								self.TargetsSlowed[unit.networkID] = self:GetTime() + (buff.endT-buff.startT)
-							end
-							return
-						end
-					end
-				end
-			end
-		end
+--Credits to Ralphlol for this function!
+function VPrediction:OnApplyBuff(source, unit, buff)
+	if not unit or not buff or unit.type ~= myHero.type then return end
+	
+	if (buff.type == 5 or buff.type == 11 or buff.type == 29 or buff.type == 24) then
+		self.TargetsImmobile[unit.networkID] = self:GetTime() + (buff.endTime - buff.startTime)
+		return
+	end
+	
+	if (buff.type == 10 or buff.type == 22 or buff.type == 21 or buff.type == 8) then
+		self.TargetsSlowed[unit.networkID] = self:GetTime() + (buff.endTime - buff.startTime)
+		return
+	end
+
+	if buff.type == 30 then
+		self.DontShoot[unit.networkID] = self:GetTime() + 1
+		return
 	end
 end
 
