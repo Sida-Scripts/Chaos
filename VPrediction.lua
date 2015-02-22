@@ -1,5 +1,5 @@
 local AUTO_UPDATE = true
-local version = '3.014'
+local version = '3.015'
 local UPDATE_HOST = 'raw.github.com'
 local UPDATE_PATH = '/SidaBoL/Chaos/master/VPrediction.lua?rand='..math.random(1,10000)
 local UPDATE_FILE_PATH = LIB_PATH..'vPrediction.lua'
@@ -42,7 +42,7 @@ function VPrediction:__init()
 			_G.VPredictionMenu:addParam('Version', 'Version', SCRIPT_PARAM_INFO, tostring(self.version))
 	end
 
-	self.WaypointsTime = 5
+	self.WaypointsTime = 2
 	
 	self.EnemyMinions = minionManager(MINION_ENEMY, 2000, myHero, MINION_SORT_HEALTH_ASC)
 	self.JungleMinions = minionManager(MINION_JUNGLE, 2000, myHero, MINION_SORT_HEALTH_ASC)
@@ -205,9 +205,8 @@ function VPrediction:OnNewPath(unit, startPos, endPos, isDash, dashSpeed ,dashGr
 	end
 	
 	--Normal movement
-	local object = unit
 	local NetworkID = unit.networkID
-	if object and object.valid and object.networkID and object.type == myHero.type then
+	if unit and unit.valid and unit.networkID and unit.type == myHero.type then
 		self.DontShootUntilNewWaypoints[NetworkID] = false
 		if self.TargetsWaypoints[NetworkID] == nil then
 			self.TargetsWaypoints[NetworkID] = {}
@@ -215,9 +214,13 @@ function VPrediction:OnNewPath(unit, startPos, endPos, isDash, dashSpeed ,dashGr
 		local WaypointsToAdd = self:GetCurrentWayPoints(unit)
 		if WaypointsToAdd and #WaypointsToAdd >= 1 then
 			--[[Save only the last waypoint (where the player clicked)]]
-			table.insert(self.TargetsWaypoints[NetworkID], {unitpos = Vector(object) , waypoint = WaypointsToAdd[#WaypointsToAdd], time = self:GetTime(), n = #WaypointsToAdd})
+			table.insert(self.TargetsWaypoints[NetworkID], {unitpos = Vector(unit) , waypoint = WaypointsToAdd[#WaypointsToAdd], time = self:GetTime(), n = #WaypointsToAdd})
 		end
-	elseif object and object.valid and object.type ~= myHero.type then
+		return
+	end
+	
+	--We need to track the minions/turrets auto attacks for health prediction
+	if unit and unit.valid and unit.type ~= myHero.type then
 		local i = 1
 		while i <= #self.ActiveAttacks do
 			if (self.ActiveAttacks[i].Attacker and self.ActiveAttacks[i].Attacker.valid and self.ActiveAttacks[i].Attacker.networkID == NetworkID and (self.ActiveAttacks[i].starttime + self.ActiveAttacks[i].windUpTime - GetLatency()/2000) > self:GetTime()) then
@@ -429,6 +432,7 @@ function VPrediction:CalculateTargetPosition(unit, delay, radius, speed, from, s
 		Position = CastPosition
 	end
 
+	-- If the target is slowed its better to just cast the skillshot centered
 	if t and self:isSlowed(unit, 0, math.huge, from) and not self:isSlowed(unit, t, math.huge, from) and Position then
 		CastPosition = Position
 	end
@@ -463,6 +467,7 @@ function VPrediction:WayPointAnalysis(unit, delay, radius, range, speed, from, s
 	end
 	]]--
 	
+	-- Avoid casting spells on random directions 
 	local N = 3
 	local t1 = 1
 	if self:CountWaypoints(unit.networkID, self:GetTime() - 0.75) >= N then
@@ -474,19 +479,32 @@ function VPrediction:WayPointAnalysis(unit, delay, radius, range, speed, from, s
 		end
 	end
 	
-	--[[
-	if self:CountWaypoints(unit.networkID, self:GetTime() - N) == 0 then
-		HitChance = 2
+	-- Detect if the enemy is clicking on a very spreaded way trying to "juke":
+	-- TODO: finetune the parameters if needed.
+	if #SavedWayPoints > 3 then
+		local mean = Vector(0, 0, 0)
+		for i, waypoint in ipairs(SavedWayPoints) do
+			mean = mean + Vector(waypoint.waypoint)
+		end
+		mean = mean / #SavedWayPoints
+		
+		--In the future this variance could be weighted according to the time passed since the order was issued
+		local variance = 0
+		for i, waypoint in ipairs(SavedWayPoints) do
+			variance = variance + GetDistanceSqr(Vector(waypoint.waypoint), mean)
+		end
+		variance = variance / #SavedWayPoints
+		
+		-- As Mr. DienoFail pointed out on PPrediction we could increase the speed instead of decreasing the hit chance but since the path can be on a completely different direction probably that wouldn't be effective at all.
+		if variance > 300 * 300 then
+			HitChance = 1
+		end
 	end
 	
-	if #CurrentWayPoints <= 1 then
-		HitChance = 2
-	end
-	
+	-- This sometimes it's not completely true but 80% of the times it is.
 	if self:isSlowed(unit, delay, speed, from) then
-		HitChance = 2
+		HitChance = 3
 	end
-	]]--
 	
 	if Position and CastPosition and ((radius / unit.ms >= delay + GetDistance(from, CastPosition)/speed) or (radius / unit.ms >= delay + GetDistance(from, Position)/speed)) then
 		HitChance = 3
@@ -498,14 +516,11 @@ function VPrediction:WayPointAnalysis(unit, delay, radius, range, speed, from, s
 		Position = CastPosition
 	end
 
+	-- If the target is too close it usually will stop, autoattack, etc. decreasing the delay we compensate that effect
 	if GetDistanceSqr(myHero, unit) < 250 * 250 and unit ~= myHero then
 		HitChance = HitChance ~= 0 and 2 or 0
 		Position, CastPosition = self:CalculateTargetPosition(unit, delay*0.5, radius, speed, from, spelltype,  dmg)
 		Position = CastPosition
-	end
-
-	if #SavedWayPoints == 0 then
-		HitChance = HitChance ~= 0 and 2 or 0
 	end
 
 	if self.DontShootUntilNewWaypoints[unit.networkID] then
@@ -567,7 +582,7 @@ function VPrediction:GetBestCastPosition(unit, delay, radius, range, speed, from
 	end
 
 	-- Out of range
-	if IsFromMyHero then
+	if IsFromMyHero and self.avoidRangeCheck == nil then
 		if (spelltype == 'line' and GetDistanceSqr(from, Position) >= range * range) then
 			HitChance = 0
 		end
@@ -1072,8 +1087,7 @@ end
 
 function VPrediction:OnTick()
 	--[[Delete the old saved Waypoints]]
-
-	if self.lastick == nil or self:GetTime() - self.lastick > 0.2 then
+	if self.lastick == nil or self:GetTime() - self.lastick > 1 then
 		self.lastick = self:GetTime()
 		for NID, TargetWaypoints in pairs(self.TargetsWaypoints) do
 			local i = 1 
@@ -1087,11 +1101,26 @@ function VPrediction:OnTick()
 		end
 
 		for i, unit in ipairs(GetEnemyHeroes()) do
-			for j = 1, unit.buffCount do
-				local buff = unit:getBuff(j)
-				if buff.valid and buff.name == 'Stun' then
-					if self.TargetsImmobile[unit.networkID] and self.TargetsImmobile[unit.networkID] < self:GetTime() then
-						self.TargetsImmobile[unit.networkID] = self:GetTime() + (buff.endT-buff.startT)
+			-- Ignore enemies that are far away for performance reasons
+			if(GetDistanceSqr(myHero, unit) < 3000 * 3000) then
+				for j = 1, unit.buffCount do
+					local buff = unit:getBuff(j)
+					if buff.valid and buff.type ~= nil then
+						-- CC, including stuns, snares etc..
+						if (buff.type == 5 or buff.type == 11  or buff.type == 29 or buff.type == 30) then
+							if self.TargetsImmobile[unit.networkID] and self.TargetsImmobile[unit.networkID] < self:GetTime() then
+								self.TargetsImmobile[unit.networkID] = self:GetTime() + (buff.endT-buff.startT)
+							end
+							return
+						end
+						
+						-- Slows, including charm, flee, etc.
+						if (buff.type == 10 or buff.type == 21 or buff.type == 22 or buff.type == 28) then
+							if self.TargetsSlowed[unit.networkID] and self.TargetsSlowed[unit.networkID] < self:GetTime() then
+								self.TargetsSlowed[unit.networkID] = self:GetTime() + (buff.endT-buff.startT)
+							end
+							return
+						end
 					end
 				end
 			end
@@ -1251,7 +1280,7 @@ DelayAction(function()
 			if tonumber(version) < ServerVersion and AUTO_UPDATE then
 				AutoupdaterMsg('New version available: ' .. ServerVersion)
 				AutoupdaterMsg('Updating, please don\'t press F9')
-				DelayAction(function() DownloadFile(UPDATE_URL, UPDATE_FILE_PATH, function () AutoupdaterMsg('Successfully updated. ('..version..' => '..ServerVersion..'), press F9 twice to load the updated version.') end) end, 3)
+				DelayAction(function() DownloadFile(UPDATE_URL, UPDATE_FILE_PATH, function () AutoupdaterMsg('Successfully updated. ('..version..' => '..ServerVersion..'), press F9 twice to load the updated version.') end) end, 1)
 			end
 		end
 		
