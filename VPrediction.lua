@@ -1,5 +1,5 @@
 local AUTO_UPDATE = true
-local version = '3.016'
+local version = '3.017'
 local UPDATE_HOST = 'raw.github.com'
 local UPDATE_PATH = '/SidaBoL/Chaos/master/VPrediction.lua?rand='..math.random(1,10000)
 local UPDATE_FILE_PATH = LIB_PATH..'vPrediction.lua'
@@ -538,6 +538,7 @@ function VPrediction:WayPointAnalysis(unit, delay, radius, range, speed, from, s
 end
 
 function VPrediction:GetBestCastPosition(unit, delay, radius, range, speed, from, collision, spelltype, dmg)
+	assert(radius, 'VPrediction: Radius can\'t be nil')
 	range = range and range - 15 or math.huge
 	radius = radius == 0 and 1 or (radius + self:GetHitBox(unit)) - 4
 	speed = (speed and speed ~= 0) and speed or math.huge
@@ -1185,7 +1186,7 @@ function VPrediction:GetHitBox(object)
 	if self.nohitboxmode and object.type and object.type == myHero.type then
 		return 0
 	end
-	return object.boundingRadius
+	return object.boundingRadius or 65
 end
 
 function VPrediction:GetProjectileSpeed(unit)
