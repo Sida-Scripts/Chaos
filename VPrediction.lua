@@ -1,5 +1,5 @@
 local AUTO_UPDATE = true
-local version = '3.018'
+local version = '3.019'
 local UPDATE_HOST = 'raw.github.com'
 local UPDATE_PATH = '/SidaBoL/Chaos/master/VPrediction.lua?rand='..math.random(1,10000)
 local UPDATE_FILE_PATH = LIB_PATH..'vPrediction.lua'
@@ -58,10 +58,7 @@ function VPrediction:__init()
 	self.AutoAttacking = {}
 	self.CastingSpells = {}
 	
-	if GetRegion() ~= 'unk' then
-		AddNewPathCallback(function(unit, startPos, endPos, isDash ,dashSpeed,dashGravity, dashDistance) self:OnNewPath(unit, startPos, endPos, isDash, dashSpeed, dashGravity, dashDistance) end)
-	end
-	
+	AddNewPathCallback(function(unit, startPos, endPos, isDash ,dashSpeed,dashGravity, dashDistance) self:OnNewPath(unit, startPos, endPos, isDash, dashSpeed, dashGravity, dashDistance) end)
 	AddProcessSpellCallback(function(unit, spell) self:OnProcessSpell(unit, spell) end)
 	AddTickCallback(function() self:OnTick() end)
 	AddDrawCallback(function() self:OnDraw() end)
