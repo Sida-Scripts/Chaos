@@ -1,5 +1,5 @@
 local AUTO_UPDATE = true
-local version = '3.017'
+local version = '3.018'
 local UPDATE_HOST = 'raw.github.com'
 local UPDATE_PATH = '/SidaBoL/Chaos/master/VPrediction.lua?rand='..math.random(1,10000)
 local UPDATE_FILE_PATH = LIB_PATH..'vPrediction.lua'
@@ -55,7 +55,9 @@ function VPrediction:__init()
 	self.DontShoot = {}
 	self.DontShoot2 = {}
 	self.DontShootUntilNewWaypoints = {}
-
+	self.AutoAttacking = {}
+	self.CastingSpells = {}
+	
 	if GetRegion() ~= 'unk' then
 		AddNewPathCallback(function(unit, startPos, endPos, isDash ,dashSpeed,dashGravity, dashDistance) self:OnNewPath(unit, startPos, endPos, isDash, dashSpeed, dashGravity, dashDistance) end)
 	end
@@ -158,6 +160,12 @@ end
 
 function VPrediction:OnProcessSpell(unit, spell)
 	if unit and unit.type == myHero.type then
+		self.CastingSpells[unit.networkID] = self:GetTime() + 0.25
+		
+		if string.match(spell.name:lower(), "attack") then
+			self.AutoAttacking[unit.networkID] = self:GetTime() + spell.windUpTime
+		end
+		
 		for i, s in ipairs(self.spells) do
 			if spell.name:lower() == s.name then
 				self.TargetsImmobile[unit.networkID] = self:GetTime() + s.duration
@@ -497,9 +505,17 @@ function VPrediction:WayPointAnalysis(unit, delay, radius, range, speed, from, s
 		variance = variance / #SavedWayPoints
 		
 		-- As Mr. DienoFail pointed out on PPrediction we could increase the speed instead of decreasing the hit chance but since the path can be on a completely different direction probably that wouldn't be effective at all.
-		if variance > 300 * 300 then
+		if variance > 200 * 200 then
 			HitChance = 1
 		end
+	end
+	
+	if self.CastingSpells[unit.networkID] ~= nil and self.CastingSpells[unit.networkID] > self:GetTime() then
+		HitChance = 2
+	end
+	
+	if self.AutoAttacking[unit.networkID] ~= nil and self.AutoAttacking[unit.networkID] > self:GetTime() then
+		HitChance = 2
 	end
 	
 	-- This sometimes it's not completely true but 80% of the times it is.
@@ -552,7 +568,7 @@ function VPrediction:GetBestCastPosition(unit, delay, radius, range, speed, from
 	assert(range > 0, 'VPrediction: range must be >0')
 	assert(speed > 0, 'VPrediction: speed must be >0')
 	
-	delay = delay + (0.04 + GetLatency() / 2000)
+	delay = delay + (0.05 + GetLatency() / 2000)
 
 	local Position, CastPosition, HitChance = Vector(unit), Vector(unit), 0
 	local TargetDashing, CanHitDashing, DashPosition = self:IsDashing(unit, delay, radius, speed, from)
