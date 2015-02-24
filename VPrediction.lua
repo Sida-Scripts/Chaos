@@ -1,5 +1,5 @@
 local AUTO_UPDATE = true
-local version = '3.021'
+local version = '3.022'
 local UPDATE_HOST = 'raw.github.com'
 local UPDATE_PATH = '/SidaBoL/Chaos/master/VPrediction.lua?rand='..math.random(1,10000)
 local UPDATE_FILE_PATH = LIB_PATH..'vPrediction.lua'
@@ -467,24 +467,7 @@ function VPrediction:WayPointAnalysis(unit, delay, radius, range, speed, from, s
     HitChance = 2
     
     CastPosition, Position, Shoot = self:CalculateTargetPosition(unit, delay, radius, speed, from, spelltype, dmg)
-    --[[
-    if self:CountWaypoints(unit.networkID, self:GetTime() - 0.1) >= 1 or self:CountWaypoints(unit.networkID, self:GetTime() - 1) == 1 then
-        HitChance = 2
-    end
-    ]]--
-    
-    -- Avoid casting spells on random directions 
-    local N = 3
-    local t1 = 1
-    if self:CountWaypoints(unit.networkID, self:GetTime() - 0.75) >= N then
-        local angle = self:MaxAngle(unit, CurrentWayPoints[#CurrentWayPoints], self:GetTime() - t1)
-        if angle > 90 then
-            HitChance = 1
-        elseif angle < 30 and self:CountWaypoints(unit.networkID, self:GetTime() - 0.1) >= 1 then
-            HitChance = 2
-        end
-    end
-    
+
     -- Detect if the enemy is clicking on a very spreaded way trying to "juke":
     -- TODO: finetune the parameters if needed.
     if #SavedWayPoints > 4 then
@@ -502,8 +485,20 @@ function VPrediction:WayPointAnalysis(unit, delay, radius, range, speed, from, s
         variance = variance / #SavedWayPoints
         
         -- As Mr. DienoFail pointed out on PPrediction we could increase the speed instead of decreasing the hit chance but since the path can be on a completely different direction probably that wouldn't be effective at all.
-        if variance > 300 * 300 then
+        if variance > 325 * 325 then
             HitChance = 1
+        end
+    end
+	
+    -- Avoid casting spells on random directions 
+    local N = 3
+    local t1 = 1
+    if self:CountWaypoints(unit.networkID, self:GetTime() - 0.75) >= N then
+        local angle = self:MaxAngle(unit, CurrentWayPoints[#CurrentWayPoints], self:GetTime() - t1)
+        if angle > 110 then
+            HitChance = 1
+        elseif angle < 30 and self:CountWaypoints(unit.networkID, self:GetTime() - 0.1) >= 1 then
+            HitChance = 2
         end
     end
     
