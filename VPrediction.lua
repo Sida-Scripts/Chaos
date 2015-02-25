@@ -1,5 +1,5 @@
 local AUTO_UPDATE = true
-local version = '3.022'
+local version = '3.023'
 local UPDATE_HOST = 'raw.github.com'
 local UPDATE_PATH = '/SidaBoL/Chaos/master/VPrediction.lua?rand='..math.random(1,10000)
 local UPDATE_FILE_PATH = LIB_PATH..'vPrediction.lua'
@@ -470,7 +470,7 @@ function VPrediction:WayPointAnalysis(unit, delay, radius, range, speed, from, s
 
     -- Detect if the enemy is clicking on a very spreaded way trying to "juke":
     -- TODO: finetune the parameters if needed.
-    if #SavedWayPoints > 4 then
+    if #SavedWayPoints > 6 then
         local mean = Vector(0, 0, 0)
         for i, waypoint in ipairs(SavedWayPoints) do
             mean = mean + Vector(waypoint.waypoint)
@@ -485,7 +485,7 @@ function VPrediction:WayPointAnalysis(unit, delay, radius, range, speed, from, s
         variance = variance / #SavedWayPoints
         
         -- As Mr. DienoFail pointed out on PPrediction we could increase the speed instead of decreasing the hit chance but since the path can be on a completely different direction probably that wouldn't be effective at all.
-        if variance > 325 * 325 then
+        if variance > 600 * 600 then
             HitChance = 1
         end
     end
