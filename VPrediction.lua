@@ -489,7 +489,7 @@ function VPrediction:WayPointAnalysis(unit, delay, radius, range, speed, from, s
             HitChance = 1
         end
     end
-	
+    
     -- Avoid casting spells on random directions 
     local N = 3
     local t1 = 1
@@ -1270,27 +1270,3 @@ function VPrediction:CalcDamageOfAttack(source, target, spell, additionalDamage)
     -- calculate damage dealt
     return damageMultiplier * totalDamage
 end
-
-AutoupdaterMsg('VPrediction ('..version..') loaded!')
-
--- Delay the auto updating to allow fast double F9
-DelayAction(function()
-    local VersionData = GetWebResult('chdev.info', '/vpred.version')
-    if VersionData ~= nil and string.match(VersionData, 'ServerVersion') and load ~= nil then
-        -- load the ServerVersion and ChangeLog
-        local Serverversion = load(VersionData)
-        if Serverversion ~= nil then
-             Serverversion()
-            -- if local version is lower then update
-            if ServerVersion ~= nil and tonumber(version) < ServerVersion and AUTO_UPDATE then
-                AutoupdaterMsg('New version available: ' .. ServerVersion)
-                AutoupdaterMsg('Updating, please don\'t press F9')
-                DelayAction(function() DownloadFile(UPDATE_URL, UPDATE_FILE_PATH, function () AutoupdaterMsg('Successfully updated. ('..version..' => '..ServerVersion..'), press F9 twice to load the updated version.') end) end, 1)
-            end
-        end
-        
-        if ChangeLog then
-            AutoupdaterMsg('Changelog: ' .. ChangeLog)
-        end
-    end
-end, 1)
